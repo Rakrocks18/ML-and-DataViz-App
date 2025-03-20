@@ -1,0 +1,4 @@
+./app.py
+./fileopener.py
+__pycache__/*
+./data_upload/__pycache__/*
