@@ -1,4 +1,2 @@
-./app.py
-./fileopener.py
-__pycache__/*
-./data_upload/__pycache__/*
+app.py
+*/__pycache__/
