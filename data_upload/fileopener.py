@@ -8,7 +8,7 @@ def open_file(uploaded_file, has_header)-> pl.DataFrame | None:
         # Load the CSV file using Polars
         df = pl.read_csv(uploaded_file, has_header=has_header)
         return df
-    elif uploaded_file.name.endswith('.xlsx'):
+    elif uploaded_file.name.endswith('.xlsx') or uploaded_file.name.endswith('.xls'):
         # Load the Excel file using Polars
         df = pl.read_excel(uploaded_file)
         return df

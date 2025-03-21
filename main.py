@@ -9,13 +9,16 @@ if "file_uploaded" not in st.session_state:
 upload_data = st.Page("data_upload\\data_upload.py", title="Upload Data", icon=":material/upload_file:")
 
 linear_model = st.Page("models\\regressions\\linear_regression.py", title="Linear Regression")
+polynomial = st.Page("models\\regressions\\polynomial_regression.py", title="Polynomial Regression")
+
 logistic_regression = st.Page("models\\classifications\\logistic_regression.py", title="Logistic Regression")
 
 if "df" in st.session_state:
     pg = st.navigation(
         {
         "Data": [upload_data],
-        "Models": [linear_model, logistic_regression]
+        "Regrssion Models": [linear_model, polynomial],
+        "Classification Models": [logistic_regression]
         }
     )
     pg.run()

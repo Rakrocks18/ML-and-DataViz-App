@@ -1,5 +1,5 @@
 
-from fileopener import open_file
+from data_upload.fileopener import open_file
 import streamlit as st
 import polars as pl
 
