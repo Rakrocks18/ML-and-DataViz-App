@@ -1,11 +1,135 @@
+import warnings
+warnings.filterwarnings('ignore', category=RuntimeWarning)
+warnings.filterwarnings('ignore', category=UserWarning)
+
 import streamlit as st
 import polars as pl
 import pandas as pd
 import plotly.express as px
+import numpy as np
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.linear_model import LogisticRegression, Lasso
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+from sklearn.svm import SVC, SVR
+from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+from sklearn.decomposition import PCA
+from hmmlearn import hmm
+import xgboost as xgb
+from sklearn.metrics import mean_squared_error, accuracy_score, r2_score
 
-from sklearn.model_selection import GridSearchCV
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
+# Define the models dictionary at module level
+models_dict = {
+    "Regression Models": {
+        "Lasso Regression": {
+            "estimator": Lasso(),
+            "param_grid": {
+                "alpha": [0.1, 1.0, 10.0],
+                "max_iter": [1000]
+            },
+            "type": "regression"
+        },
+        "Random Forest Regressor": {
+            "estimator": RandomForestRegressor(),
+            "param_grid": {
+                "n_estimators": [50, 100, 200],
+                "max_depth": [None, 10, 20]
+            },
+            "type": "regression"
+        },
+        "SVR": {
+            "estimator": SVR(),
+            "param_grid": {
+                "C": [0.1, 1, 10],
+                "kernel": ["rbf", "linear"]
+            },
+            "type": "regression"
+        },
+        "KNN Regressor": {
+            "estimator": KNeighborsRegressor(),
+            "param_grid": {
+                "n_neighbors": [3, 5, 7],
+                "weights": ["uniform", "distance"]
+            },
+            "type": "regression"
+        }
+    },
+    "Classification Models": {
+        "Logistic Regression": {
+            "estimator": LogisticRegression(),
+            "param_grid": {
+                "C": [0.1, 1, 10],
+                "max_iter": [1000]
+            },
+            "type": "classification"
+        },
+        "Random Forest Classifier": {
+            "estimator": RandomForestClassifier(),
+            "param_grid": {
+                "n_estimators": [50, 100, 200],
+                "max_depth": [None, 10, 20]
+            },
+            "type": "classification"
+        },
+        "Decision Tree": {
+            "estimator": DecisionTreeClassifier(),
+            "param_grid": {
+                "max_depth": [None, 10, 20, 30],
+                "min_samples_split": [2, 5, 10]
+            },
+            "type": "classification"
+        },
+        "XGBoost": {
+            "estimator": xgb.XGBClassifier(),
+            "param_grid": {
+                "n_estimators": [50, 100],
+                "max_depth": [3, 6],
+                "learning_rate": [0.01, 0.1]
+            },
+            "type": "classification"
+        },
+        "SVM": {
+            "estimator": SVC(),
+            "param_grid": {
+                "C": [0.1, 1, 10],
+                "kernel": ["rbf", "linear"]
+            },
+            "type": "classification"
+        },
+        "KNN Classifier": {
+            "estimator": KNeighborsClassifier(),
+            "param_grid": {
+                "n_neighbors": [3, 5, 7],
+                "weights": ["uniform", "distance"]
+            },
+            "type": "classification"
+        }
+    },
+    "Dimensionality Reduction": {
+        "PCA": {
+            "estimator": PCA(n_components=0.95),
+            "param_grid": {},
+            "type": "dimensionality_reduction"
+        }
+    },
+    "Sequential Learning": {
+        "HMM": {
+            "estimator": hmm.GaussianHMM(
+                n_components=3,
+                covariance_type="full",
+                n_iter=100,
+                random_state=42
+            ),
+            "param_grid": {
+                "n_components": [2, 3, 4],
+                "covariance_type": ["full", "tied", "diag", "spherical"],
+                "n_iter": [50, 100, 200]
+            },
+            "type": "sequential"
+        }
+    }
+}
 
 # ------------------------------
 # Data Loading Functions
@@ -91,17 +215,126 @@ def get_plot(df: pl.DataFrame, plot_type: str, x_col: str, y_col: str):
 # ------------------------------
 def run_grid_search(df: pl.DataFrame, features: list, target: str, model_info: dict):
     """
-    Run GridSearchCV on the provided dataset.
+    Run GridSearchCV on the provided dataset with proper preprocessing of categorical features.
     'model_info' is a dictionary containing the sklearn estimator and parameter grid.
     """
-    # Convert Polars DataFrame to pandas for scikit-learn
-    pdf = df.to_pandas()
-    X = pdf[features]
-    y = pdf[target]
+    try:
+        # Convert Polars DataFrame to pandas for scikit-learn
+        pdf = df.to_pandas()
+        X = pdf[features].copy()
+        y = pdf[target].copy()
+        
+        # Handle categorical variables
+        label_encoders = {}
+        for column in X.select_dtypes(include=['object']).columns:
+            label_encoders[column] = LabelEncoder()
+            X[column] = label_encoders[column].fit_transform(X[column])
+        
+        if y.dtype == 'object':
+            y = LabelEncoder().fit_transform(y)
+        
+        # Standardize features
+        scaler = StandardScaler()
+        X = scaler.fit_transform(X)
+        
+        if model_info.get("type") == "sequential":
+            # Handle sequential models (HMM)
+            # Reshape data for HMM (samples, timesteps, features)
+            X_reshaped = X.reshape(-1, 1, X.shape[1])
+            
+            # Split data
+            X_train, X_test, y_train, y_test = train_test_split(
+                X_reshaped, y, test_size=0.2, random_state=42
+            )
+            
+            # Create and train model
+            model = model_info["estimator"]
+            model.fit(X_train.reshape(-1, X_train.shape[-1]))
+            
+            # Get predictions and probabilities
+            hidden_states = model.predict(X_test.reshape(-1, X_test.shape[-1]))
+            log_likelihood = model.score(X_test.reshape(-1, X_test.shape[-1]))
+            
+            # Calculate metrics
+            mse = mean_squared_error(y_test, hidden_states)
+            r2 = r2_score(y_test, hidden_states)
+            
+            # Format results
+            best_params = {
+                "n_components": model.n_components,
+                "covariance_type": model.covariance_type,
+                "n_iter": model.n_iter
+            }
+            
+            # Calculate normalized score
+            max_log_likelihood = 0  # theoretical maximum
+            min_log_likelihood = -1000  # reasonable minimum
+            normalized_score = (log_likelihood - min_log_likelihood) / (max_log_likelihood - min_log_likelihood)
+            normalized_score = max(0, min(1, normalized_score))  # clip between 0 and 1
+            
+            return model, best_params, normalized_score
+            
+        elif model_info.get("type") == "dimensionality_reduction":
+            # Handle PCA
+            model = model_info["estimator"]
+            model.fit(X)
+            explained_variance = model.explained_variance_ratio_
+            return model, {"n_components": model.n_components_}, sum(explained_variance)
+        else:
+            # Regular supervised learning models
+            # Calculate appropriate number of CV splits
+            min_samples = min(np.bincount(y)) if model_info.get("type") == "classification" else len(y) // 2
+            max_splits = min_samples // 2
+            n_splits = max(2, min(3, max_splits))
+            
+            grid_search = GridSearchCV(model_info["estimator"], model_info["param_grid"], cv=n_splits)
+            grid_search.fit(X, y)
+            return grid_search.best_estimator_, grid_search.best_params_, grid_search.best_score_
+            
+    except Exception as e:
+        st.error(f"Error during model training: {str(e)}")
+        st.info("Try selecting different features or adjusting the model parameters.")
+        return None, None, None
 
-    grid_search = GridSearchCV(model_info["estimator"], model_info["param_grid"], cv=3)
-    grid_search.fit(X, y)
-    return grid_search.best_estimator_, grid_search.best_params_, grid_search.best_score_
+def run_q_learning(X, y, model_info, episodes=1000):
+    """
+    Simple Q-learning implementation for tabular data
+    """
+    n_states = len(X)
+    n_actions = len(np.unique(y))
+    Q = np.zeros((n_states, n_actions))
+    
+    # Q-learning parameters
+    alpha = 0.1  # learning rate
+    gamma = 0.95  # discount factor
+    epsilon = 0.1  # exploration rate
+    
+    for episode in range(episodes):
+        state = np.random.randint(n_states)
+        done = False
+        
+        while not done:
+            if np.random.random() < epsilon:
+                action = np.random.randint(n_actions)
+            else:
+                action = np.argmax(Q[state])
+            
+            next_state = (state + 1) % n_states
+            reward = 1 if action == y[state] else 0
+            
+            # Q-learning update
+            Q[state, action] = Q[state, action] + alpha * (
+                reward + gamma * np.max(Q[next_state]) - Q[state, action]
+            )
+            
+            state = next_state
+            done = state == n_states - 1
+    
+    # Evaluate performance
+    predictions = np.array([np.argmax(Q[i]) for i in range(n_states)])
+    accuracy = accuracy_score(y, predictions)
+    
+    return Q, {"episodes": episodes, "alpha": alpha, "gamma": gamma}, accuracy
 
 # ------------------------------
 # Main Application
@@ -154,38 +387,35 @@ def main():
                     st.plotly_chart(fig, use_container_width=True)
 
         elif action == "ML Model":
-            st.header("ML Model using GridSearchCV")
-            # Use preprocessed data if available and opted.
-            if use_preprocessed and st.session_state.preprocessed_df is not None:
-                df = st.session_state.preprocessed_df
-                st.info("Using preprocessed data for modeling.")
+            st.header("ML Model Selection and Training")
+            
+            # First select the model category
+            model_category = st.selectbox("Select Model Category", list(models_dict.keys()))
+            
+            # Then select the specific model from that category
+            model_choice = st.selectbox("Select Model", list(models_dict[model_category].keys()))
+            
             cols = df.columns
             features = st.multiselect("Select Feature Columns", cols)
             target = st.selectbox("Select Target Column", cols)
 
-            # Define available models and their GridSearchCV parameters.
-            # Extend this dictionary to add more models or parameters.
-            models_dict = {
-                "Logistic Regression": {
-                    "estimator": LogisticRegression(),
-                    "param_grid": {"C": [0.1, 1, 10], "max_iter": [100, 200]},
-                },
-                "Random Forest": {
-                    "estimator": RandomForestClassifier(),
-                    "param_grid": {"n_estimators": [50, 100, 200], "max_depth": [None, 10, 20]},
-                },
-            }
-
-            model_choice = st.selectbox("Select Model", list(models_dict.keys()))
-            if st.button("Run GridSearchCV"):
+            if st.button("Train Model"):
                 if features and target:
-                    best_model, best_params, best_score = run_grid_search(df, features, target, models_dict[model_choice])
-                    st.subheader("Best Model & Parameters")
-                    st.write("Best Model:", best_model)
-                    st.write("Best Parameters:", best_params)
-                    st.write("Best CV Score:", best_score)
+                    model_info = models_dict[model_category][model_choice]
+                    best_model, best_params, best_score = run_grid_search(df, features, target, model_info)
+                    
+                    if best_model is not None:
+                        st.subheader("Model Results")
+                        st.write("Best Model:", best_model)
+                        st.write("Best Parameters:", best_params)
+                        st.write("Best Score:", best_score)
+                        
+                        # Additional information for PCA
+                        if model_choice == "PCA":
+                            st.write("Explained Variance Ratio:", best_model.explained_variance_ratio_)
+                            st.line_chart(np.cumsum(best_model.explained_variance_ratio_))
                 else:
-                    st.error("Please select the feature(s) and target column.")
+                    st.error("Please select feature(s) and target column.")
 
     else:
         st.info("Awaiting file upload...")
