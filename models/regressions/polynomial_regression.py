@@ -1,99 +1,231 @@
 import streamlit as st
-from sklearn.preprocessing import PolynomialFeatures
-from sklearn.pipeline import make_pipeline
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-import polars as pl
+import plotly.express as px
+import plotly.graph_objects as go
 import numpy as np
+import pandas as pd
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import LinearRegression
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import r2_score, mean_squared_error
 
-def polynomial_regression_page():
-    st.title("Polynomial Regression")
-    
-    if "df" not in st.session_state:
-        st.warning("Please upload data first!")
-        return
-        
-    df = st.session_state.df
-    
-    st.subheader("Polynomial Regression Model")
-    
-    cols = df.columns
-    features = st.multiselect("Select Feature Columns", cols)
-    target = st.selectbox("Select Target Column", cols)
+st.title("Polynomial Regression Analysis")
 
-    if features and target:
-        X = df.select(features).to_numpy()
-        y = df.select(target).to_numpy()
+if "X_train" not in st.session_state:
+    st.warning("Please split your data first using the 'Split Data' page!")
+else:
+    # Get data from session state
+    X_train = st.session_state.X_train
+    X_test = st.session_state.X_test
+    y_train = st.session_state.y_train
+    y_test = st.session_state.y_test
+    target_name = y_train.name
 
-        test_size = st.number_input("Enter Test Size", min_value=0.05, max_value=1.0, value=0.1, step=0.05, format="%.2f")
-        random_state = st.number_input("Enter Random State", min_value=0, max_value=100)
-        shuffle = st.checkbox("Shuffle Data", value=True)
+    # Create tabs
+    tab1, tab2 = st.tabs(["Manual Mode", "GridSearchCV"])
 
-        degree_option = st.radio("Choose Polynomial Degree Mode", ("Manual", "Grid Search"))
-        
-        if degree_option == "Manual":
-            degree = st.number_input("Enter Polynomial Degree", min_value=1, max_value=10, value=2, step=1)
+    with tab1:
+        # Feature and degree selection
+        col1, col2 = st.columns(2)
+        with col1:
+            available_features = X_train.columns.tolist()
+            selected_features = st.multiselect(
+                "Select Features for Regression",
+                options=available_features,
+                help="Choose 1 feature for polynomial regression or multiple for multivariate"
+            )
+        with col2:
+            degree = st.number_input("Polynomial Degree", 
+                                    min_value=1, 
+                                    max_value=5, 
+                                    value=2,
+                                    help="Higher degrees may cause overfitting!")
+
+        if not selected_features:
+            st.error("Please select at least one feature!")
         else:
-            min_degree = st.number_input("Min Degree", min_value=1, max_value=10, value=1, step=1)
-            max_degree = st.number_input("Max Degree", min_value=1, max_value=10, value=5, step=1)
-            cv_folds = st.number_input("Cross-Validation Folds", min_value=2, max_value=10, value=5, step=1)
+            # Create polynomial features
+            poly = PolynomialFeatures(degree=degree, include_bias=False)
+            X_train_poly = poly.fit_transform(X_train[selected_features])
+            X_test_poly = poly.transform(X_test[selected_features])
+            feature_names = poly.get_feature_names_out(selected_features)
+
+            # Train model
+            model = LinearRegression()
+            model.fit(X_train_poly, y_train)
+            
+            # Make predictions
+            y_train_pred = model.predict(X_train_poly)
+            y_test_pred = model.predict(X_test_poly)
+
+            # Calculate metrics
+            train_r2 = r2_score(y_train, y_train_pred)
+            test_r2 = r2_score(y_test, y_test_pred)
+            train_mse = mean_squared_error(y_train, y_train_pred)
+            test_mse = mean_squared_error(y_test, y_test_pred)
+
+            # Display metrics
+            st.subheader("Model Performance")
+            col1, col2 = st.columns(2)
+            col1.metric("Training R² Score", f"{train_r2:.3f}")
+            col2.metric("Testing R² Score", f"{test_r2:.3f}")
+            col1.metric("Training MSE", f"{train_mse:.3f}")
+            col2.metric("Testing MSE", f"{test_mse:.3f}")
+
+            # Show coefficients
+            st.subheader("Model Coefficients")
+            coeff_df = pd.DataFrame({
+                "Feature": feature_names,
+                "Coefficient": model.coef_
+            })
+            coeff_df.loc[len(coeff_df)] = ["Intercept", model.intercept_]
+            st.dataframe(coeff_df, hide_index=True)
+
+            # Visualization section
+            st.subheader("Visualization")
+            
+            if len(selected_features) == 1:  # Single feature visualization
+                # Generate smooth curve
+                x_curve = np.linspace(
+                    X_train[selected_features[0]].min(),
+                    X_train[selected_features[0]].max(),
+                    300
+                ).reshape(-1, 1)
+                
+                x_curve_poly = poly.transform(x_curve)
+                y_curve = model.predict(x_curve_poly)
+
+                fig = go.Figure()
+                # Training data
+                fig.add_trace(go.Scatter(
+                    x=X_train[selected_features[0]],
+                    y=y_train,
+                    mode='markers',
+                    name='Training Data',
+                    marker=dict(color='blue', opacity=0.5)
+                ))
+                
+                # Test data
+                fig.add_trace(go.Scatter(
+                    x=X_test[selected_features[0]],
+                    y=y_test,
+                    mode='markers',
+                    name='Test Data',
+                    marker=dict(color='red', opacity=0.5)
+                ))
+                
+                # Polynomial curve
+                fig.add_trace(go.Scatter(
+                    x=x_curve.flatten(),
+                    y=y_curve,
+                    mode='lines',
+                    name=f'Degree {degree} Fit',
+                    line=dict(color='black', width=3)
+                ))
+                
+                fig.update_layout(
+                    title=f"{target_name} vs {selected_features[0]} (Degree {degree})",
+                    xaxis_title=selected_features[0],
+                    yaxis_title=target_name
+                )
+                st.plotly_chart(fig, use_container_width=True)
+                
+            else:  # Multiple features visualization
+                # Residual plot
+                residuals = y_test - y_test_pred
+                fig1 = px.scatter(
+                    x=y_test_pred,
+                    y=residuals,
+                    labels={'x': 'Predicted Values', 'y': 'Residuals'},
+                    title='Residual Plot'
+                )
+                fig1.add_hline(y=0, line_dash="dot", line_color="red")
+                st.plotly_chart(fig1, use_container_width=True)
+
+                # Coefficient plot
+                fig2 = px.bar(
+                    x=coeff_df["Coefficient"][:-1],
+                    y=coeff_df["Feature"][:-1],
+                    orientation='h',
+                    labels={'x': 'Coefficient Value', 'y': 'Feature'},
+                    title='Polynomial Feature Coefficients'
+                )
+                st.plotly_chart(fig2, use_container_width=True)
+
+            # Model complexity warning
+            if degree > 3 and test_r2 < train_r2:
+                st.warning("Warning: Potential overfitting detected! Test performance is worse than training performance.")
+
+    
+    with tab2:
+        st.header("Automated Polynomial Degree Selection")
         
-        if st.button("Train Model"):
-            try:
-                X_train, X_test, y_train, y_test = train_test_split(
-                    X, y, test_size=test_size, random_state=random_state, shuffle=shuffle
-                )
+        selected_features = st.multiselect(
+            "Select Features for Polynomial Regression",
+            options=X_train.columns.tolist()
+        )
+        
+        if selected_features:
+            # Create pipeline
+            pipeline = Pipeline([
+                ('poly', PolynomialFeatures()),
+                ('linear', LinearRegression())
+            ])
 
-                if degree_option == "Manual":
-                    model = make_pipeline(PolynomialFeatures(degree), LinearRegression())
-                    model.fit(X_train, y_train)
-                else:
-                    param_grid = {"polynomialfeatures__degree": np.arange(min_degree, max_degree + 1)}
-                    pipeline = make_pipeline(PolynomialFeatures(), LinearRegression())
-                    grid_search = GridSearchCV(pipeline, param_grid, cv=cv_folds)
-                    grid_search.fit(X_train, y_train)
-                    model = grid_search.best_estimator_
-                    degree = grid_search.best_params_["polynomialfeatures__degree"]
-                    st.write(f"Optimal Polynomial Degree: {degree}")
+            # Parameter grid
+            param_grid = {
+                'poly__degree': list(range(1, 6)),
+                'poly__interaction_only': [True, False]
+            }
 
-                st.success("Model trained successfully.")
-                
-                st.write("Model Coefficients: ", model.named_steps["linearregression"].coef_.reshape(1, -1))
-                st.write("Model Intercept: ", model.named_steps["linearregression"].intercept_)
-                
-                st.subheader("Model Evaluation")
-                y_pred = model.predict(X_test)
-                pred_df = pl.DataFrame({
-                    "Actual Data": y_test.ravel(), 
-                    "Prediction": y_pred.ravel()
-                })
-                st.dataframe(pred_df.head(20).to_pandas())
+            # GridSearchCV setup
+            gs = GridSearchCV(
+                pipeline,
+                param_grid,
+                cv=5,
+                scoring='r2',
+                n_jobs=-1
+            )
 
-                st.write("Test Score: ")
-                st.write("Mean Absolute Error: ", mean_absolute_error(y_test, y_pred))
-                st.write("Mean Squared Error: ", mean_squared_error(y_test, y_pred))
+            if st.button("Run GridSearchCV"):
+                gs.fit(X_train[selected_features], y_train)
                 
-                # Visualization of results
-                import plotly.express as px
-                fig = px.scatter(
-                    x=y_test.ravel(),
-                    y=y_pred.ravel(),
-                    labels={'x': 'Actual Values', 'y': 'Predicted Values'},
-                    title='Actual vs Predicted Values'
-                )
-                fig.add_shape(
-                    type='line',
-                    x0=y_test.min(),
-                    y0=y_test.min(),
-                    x1=y_test.max(),
-                    y1=y_test.max(),
-                    line=dict(color='red', dash='dash')
-                )
-                st.plotly_chart(fig)
+                # Best model results
+                best_degree = gs.best_params_['poly__degree']
+                best_interaction = gs.best_params_['poly__interaction_only']
                 
-            except Exception as e:
-                st.error(f"Error during model training: {str(e)}")
-                st.info("Try selecting different features or adjusting the parameters.")
-    else:
-        st.warning("Please select both features and target columns.")
+                st.subheader("Best Parameters")
+                st.write(f"**Optimal Degree:** {best_degree}")
+                st.write(f"**Interaction Only:** {best_interaction}")
+                st.write(f"**Best R² Score (CV):** {gs.best_score_:.3f}")
+
+                # Test set performance
+                y_pred = gs.predict(X_test[selected_features])
+                test_r2 = r2_score(y_test, y_pred)
+                test_mse = mean_squared_error(y_test, y_pred)
+                st.write(f"**Test R²:** {test_r2:.3f}")
+                st.write(f"**Test MSE:** {test_mse:.3f}")
+
+                # Validation curve visualization
+                results = pd.DataFrame(gs.cv_results_)
+                fig = px.line(
+                    results[results['param_poly__interaction_only'] == best_interaction],
+                    x='param_poly__degree',
+                    y='mean_test_score',
+                    error_y='std_test_score',
+                    title='Validation Curve for Polynomial Degree'
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+                # Feature importance visualization
+                poly = gs.best_estimator_.named_steps['poly']
+                feature_names = poly.get_feature_names_out(selected_features)
+                coefficients = gs.best_estimator_.named_steps['linear'].coef_
+                
+                fig2 = px.bar(
+                    x=feature_names,
+                    y=coefficients,
+                    labels={'x': 'Features', 'y': 'Coefficient Value'},
+                    title='Feature Coefficients'
+                )
+                st.plotly_chart(fig2, use_container_width=True)
