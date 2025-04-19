@@ -58,7 +58,7 @@ def preprocess_data(df: pl.DataFrame) -> pl.DataFrame:
         columns_to_convert = st.multiselect("Select columns to convert to numeric", df.columns)
         for col in columns_to_convert:
             try:
-                df = df.with_column(pl.col(col).cast(pl.Float64))
+                df = df.with_columns(pl.col(col).cast(pl.Float64))
                 st.write(f"Converted column '{col}' to numeric type.")
             except Exception as e:
                 st.error(f"Error converting column {col}: {e}")
