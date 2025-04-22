@@ -47,6 +47,10 @@ simple_nn = st.Page("models/neural_networks/simple_nn.py", title="Simple Neural 
 # Sequential Learning Models
 hmm_model = st.Page("models/sequential_learning/hmm_model.py", title="Hidden Markov Model")
 
+#model comparision 
+model_comparison = st.Page("analysis/model_comparison.py", title="Model Comparison", icon="⚖️")
+# Add to navigation dictionary under "Analysis" or at the end
+
 # Navigation based on data availability
 if "df" in st.session_state:
     pg = st.navigation({
@@ -59,7 +63,8 @@ if "df" in st.session_state:
         "Neighbors": [knn],
         "SVM": [svm_model],
         "Neural Networks": [simple_nn],
-        "Sequential Learning": [hmm_model]
+        "Sequential Learning": [hmm_model],
+        "Analysis": [model_comparison]
     })
 else:
     pg = st.navigation({
