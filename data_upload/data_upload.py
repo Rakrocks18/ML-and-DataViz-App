@@ -15,5 +15,5 @@ if uploaded_file is not None:
         st.error("There was an error loading your file!")
     else:
         st.session_state.df = df
-        st.subheader("Raw Data Preview")
-        st.dataframe(st.session_state.df.head().to_pandas())
+        # st.subheader("Raw Data Preview")
+        # st.dataframe(st.session_state.df.head())

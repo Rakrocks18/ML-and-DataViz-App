@@ -23,6 +23,11 @@ histograms = st.Page("visualization/histogram.py", title="Distributions", icon="
 box_plots = st.Page("visualization/box_plots.py", title="Box Plots", icon="📦")
 correlation = st.Page("visualization/correlation.py", title="Correlations", icon="🔗")
 pair_plots = st.Page("visualization/pair_plots.py", title="Pair Plots", icon="🔄")
+# Visualization Pages
+line_plots = st.Page("visualization/line_plot.py", title="Line Plots", icon="📉")
+pie_charts = st.Page("visualization/pie_chart.py", title="Pie Charts", icon="🥧")
+treemap = st.Page("visualization/treemap.py", title="Treemap", icon="🌳")
+waffle_charts = st.Page("visualization/waffle_chart.py", title="Waffle Charts", icon="🧇")
 
 # Regression Models
 linear_model = st.Page("models/regressions/linear_regression.py", title="Linear Regression")
@@ -56,7 +61,7 @@ if "df" in st.session_state:
     pg = st.navigation({
         "Data": [upload_data, live_data],
         "Preprocessing": [handle_missing, encode_categorical, feature_scaling, split_data],
-        "Visualization": [scatter_plots, histograms, box_plots, correlation, pair_plots],
+        "Visualization": [scatter_plots, histograms, box_plots, line_plots, correlation, pair_plots, pie_charts, treemap, waffle_charts],
         "Regression Models": [linear_model, polynomial, lasso],
         "Classification Models": [logistic_regression],
         "Trees": [decision_tree],
