@@ -49,6 +49,12 @@ svm_model = st.Page("models/classifications/svm.py", title="Support Vector Machi
 #Neural Networks
 simple_nn = st.Page("models/neural_networks/simple_nn.py", title="Simple Neural Network")
 
+# Clustering Models
+kmeans = st.Page("models/clustering/kmeans.py", title="K-Means")
+dbscan = st.Page("models/clustering/dbscan.py", title="DBSCAN")
+hierarchical = st.Page("models/clustering/hierarchical.py", title="Hierarchical")
+gmm = st.Page("models/clustering/gmm.py", title="Gaussian Mixture Models")
+
 # Sequential Learning Models
 hmm_model = st.Page("models/sequential_learning/hmm_model.py", title="Hidden Markov Model")
 
@@ -68,6 +74,7 @@ if "df" in st.session_state:
         "Neighbors": [knn],
         "SVM": [svm_model],
         "Neural Networks": [simple_nn],
+        "Clustering": [kmeans, dbscan, hierarchical, gmm],
         "Sequential Learning": [hmm_model],
         "Analysis": [model_comparison]
     })
