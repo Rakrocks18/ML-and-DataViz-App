@@ -29,13 +29,31 @@ else:
     if not selected_features:
         st.error("Please select at least one feature!")
     else:
-        # Train model
+        # Identify categorical and numerical features
+        categorical_features = [feat for feat in selected_features if X_train[feat].dtype == 'object']
+        numerical_features = [feat for feat in selected_features if feat not in categorical_features]
+        
+        # Handle categorical features with one-hot encoding
+        if categorical_features:
+            X_train_cat = pd.get_dummies(X_train[categorical_features], prefix=categorical_features)
+            X_test_cat = pd.get_dummies(X_test[categorical_features], prefix=categorical_features)
+            # Align train and test encoded features to ensure consistent columns
+            X_train_cat, X_test_cat = X_train_cat.align(X_test_cat, join='outer', axis=1, fill_value=0)
+        else:
+            X_train_cat = pd.DataFrame(index=X_train.index)
+            X_test_cat = pd.DataFrame(index=X_test.index)
+        
+        # Combine numerical and encoded categorical features
+        X_train_final = pd.concat([X_train[numerical_features], X_train_cat], axis=1)
+        X_test_final = pd.concat([X_test[numerical_features], X_test_cat], axis=1)
+        
+        # Train model with the processed features
         model = LinearRegression()
-        model.fit(X_train[selected_features], y_train)
+        model.fit(X_train_final, y_train)
         
         # Make predictions
-        y_train_pred = model.predict(X_train[selected_features])
-        y_test_pred = model.predict(X_test[selected_features])
+        y_train_pred = model.predict(X_train_final)
+        y_test_pred = model.predict(X_test_final)
         
         # Calculate metrics
         train_r2 = r2_score(y_train, y_train_pred)
@@ -51,10 +69,34 @@ else:
         col1.metric("Training MSE", f"{train_mse:.3f}")
         col2.metric("Testing MSE", f"{test_mse:.3f}")
         
-        # Show coefficients
+        # Model comparison functionality (your addition)
+        st.subheader("Save Model for Comparison")
+        model_name = st.text_input("Model Name", f"Linear Regression ({', '.join(selected_features)})")
+        
+        if st.button("Save Model Metrics"):
+            # Initialize model_metrics in session state if it doesn't exist
+            if "model_metrics" not in st.session_state:
+                st.session_state.model_metrics = {}
+                
+            # Set task type for proper comparison
+            st.session_state.task_type = "regression"
+                
+            # Save metrics to session state
+            st.session_state.model_metrics[model_name] = {
+                "Test R²": test_r2,
+                "Train R²": train_r2,
+                "Test MSE": test_mse,
+                "Train MSE": train_mse,
+                "RMSE": np.sqrt(test_mse)
+            }
+            
+            st.success(f"Model '{model_name}' saved for comparison!")
+            st.info("Go to the Model Comparison page to compare with other models.")
+        
+        # Show coefficients using the final feature set
         st.subheader("Model Coefficients")
         coeff_df = pd.DataFrame({
-            "Feature": selected_features,
+            "Feature": X_train_final.columns,
             "Coefficient": model.coef_
         })
         coeff_df.loc[len(coeff_df)] = ["Intercept", model.intercept_]
@@ -63,13 +105,14 @@ else:
         # Visualization section
         st.subheader("Visualization")
         
-        if len(selected_features) == 1:  # Simple regression plot
-            # Create figure
+        if len(numerical_features) == 1 and len(categorical_features) == 0:
+            # Simple regression plot (only for a single numerical feature)
+            feature = numerical_features[0]
             fig = go.Figure()
             
             # Add training data
             fig.add_trace(go.Scatter(
-                x=X_train[selected_features[0]],
+                x=X_train[feature],
                 y=y_train,
                 mode='markers',
                 name='Training Data',
@@ -78,7 +121,7 @@ else:
             
             # Add test data
             fig.add_trace(go.Scatter(
-                x=X_test[selected_features[0]],
+                x=X_test[feature],
                 y=y_test,
                 mode='markers',
                 name='Test Data',
@@ -86,12 +129,8 @@ else:
             ))
             
             # Add regression line
-            x_line = np.linspace(
-                X_train[selected_features[0]].min(),
-                X_train[selected_features[0]].max(),
-                100
-            )
-            y_line = model.predict(x_line.reshape(-1, 1))
+            x_line = np.linspace(X_train[feature].min(), X_train[feature].max(), 100)
+            y_line = model.predict(x_line.reshape(-1, 1))  # Works since only one numerical feature
             
             fig.add_trace(go.Scatter(
                 x=x_line,
@@ -102,14 +141,15 @@ else:
             ))
             
             fig.update_layout(
-                title=f"{target_name} vs {selected_features[0]}",
-                xaxis_title=selected_features[0],
+                title=f"{target_name} vs {feature}",
+                xaxis_title=feature,
                 yaxis_title=target_name,
                 hovermode='closest'
             )
             st.plotly_chart(fig, use_container_width=True)
             
-        else:  # Multiple regression visualization
+        else:
+            # Multiple regression visualization (for multiple features or any categorical features)
             # Residual plot
             residuals = y_test - y_test_pred
             fig1 = px.scatter(
@@ -121,10 +161,10 @@ else:
             fig1.add_hline(y=0, line_dash="dot", line_color="red")
             st.plotly_chart(fig1, use_container_width=True)
             
-            # Feature importance
+            # Feature coefficients
             fig2 = px.bar(
                 x=model.coef_,
-                y=selected_features,
+                y=X_train_final.columns,
                 orientation='h',
                 labels={'x': 'Coefficient Value', 'y': 'Feature'},
                 title='Feature Coefficients'
