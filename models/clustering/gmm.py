@@ -3,15 +3,16 @@ import plotly.express as px
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
+import polars as pl
 
 st.title("Gaussian Mixture Models")
 
 if "df" not in st.session_state:
     st.warning("Please upload data first!")
 else:
-    df = st.session_state.df.select_dtypes(include='number')
+    df = st.session_state.df.select(pl.col(pl.NUMERIC_DTYPES))
     
-    features = st.multiselect("Select Features", df.columns.tolist())
+    features = st.multiselect("Select Features", df.columns)
     n_components = st.slider("Number of Components", 1, 10, 3)
     covariance_type = st.selectbox("Covariance Type", 
                                 ['full', 'tied', 'diag', 'spherical'])

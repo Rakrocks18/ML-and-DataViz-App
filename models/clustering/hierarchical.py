@@ -4,15 +4,16 @@ import plotly.express as px
 from sklearn.cluster import AgglomerativeClustering
 from scipy.cluster.hierarchy import dendrogram, linkage
 from sklearn.decomposition import PCA
+import polars as pl
 
 st.title("Hierarchical Clustering")
 
 if "df" not in st.session_state:
     st.warning("Please upload data first!")
 else:
-    df = st.session_state.df.select_dtypes(include='number')
+    df = st.session_state.df.select(pl.col(pl.NUMERIC_DTYPES))
     
-    features = st.multiselect("Select Features", df.columns.tolist())
+    features = st.multiselect("Select Features", df.columns)
     n_clusters = st.slider("Number of Clusters", 2, 10, 3)
     linkage_method = st.selectbox("Linkage Method", 
                                 ['ward', 'complete', 'average', 'single'])

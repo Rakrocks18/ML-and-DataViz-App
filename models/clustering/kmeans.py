@@ -4,18 +4,20 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.decomposition import PCA
 
+import polars as pl
+
 st.title("K-Means Clustering")
 
 if "df" not in st.session_state:
     st.warning("Please upload data first!")
 else:
-    df = st.session_state.df.select_dtype(include='number')
+    df = st.session_state.df.select(pl.col(pl.NUMERIC_DTYPES))
     
     tab1, tab2 = st.tabs(["Manual Configuration", "Elbow Method Analysis"])
     
     with tab1:
         st.header("Manual Clustering")
-        features = st.multiselect("Select Features", df.columns.to_list())
+        features = st.multiselect("Select Features", df.columns)
         n_clusters = st.slider("Number of Clusters", 2, 10, 3)
         max_iter = st.slider("Max Iterations", 100, 1000, 300)
         
@@ -40,7 +42,7 @@ else:
     
     with tab2:
         st.header("Elbow Method Analysis")
-        features_elbow = st.multiselect("Select Features for Analysis", df.columns.tolist())
+        features_elbow = st.multiselect("Select Features for Analysis", df.columns)
         max_clusters = st.slider("Max Clusters to Test", 2, 15, 8)
         
         if st.button("Run Elbow Analysis") and features_elbow:
@@ -57,6 +59,6 @@ else:
             fig = px.line(x=range(2, max_clusters+1), y=inertias, 
                         title="Elbow Method - Inertia vs Number of Clusters",
                         labels={'x': 'Number of Clusters', 'y': 'Inertia'})
-            fig.add_scatter(x=range(2, max_clusters+1), y=s_scores, mode='lines', 
-                           name='Silhouette Score', secondary_y=True)
+            fig.add_scatter(x=list(range(2, max_clusters+1)), y=s_scores, mode='lines', 
+                           name='Silhouette Score', secondary_y=False)
             st.plotly_chart(fig)
