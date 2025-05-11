@@ -9,6 +9,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import r2_score, mean_squared_error
 from sklearn.compose import ColumnTransformer
+from analysis.model_metrics_container import ModelMetric, ModelMetricsContainer
+
 
 st.title("Polynomial Regression Analysis")
 
@@ -21,6 +23,8 @@ else:
     y_train = st.session_state.y_train
     y_test = st.session_state.y_test
     target_name = y_train.name
+
+    st.session_state.task_type = "regression"  # Set task type to regression
 
     # Create tabs
     tab1, tab2 = st.tabs(["Manual Mode", "GridSearchCV"])
@@ -103,21 +107,14 @@ else:
             
             if st.button("Save Model Metrics"):
                 # Initialize model_metrics in session state if it doesn't exist
+                model_metrics = ModelMetric(model_name=model_name, metrics={
+                    "Train R²": train_r2, "Test R²": test_r2,
+                    "Train MSE": train_mse, "Test MSE": test_mse, "RMSE": np.sqrt(test_mse)})
+
                 if "model_metrics" not in st.session_state:
-                    st.session_state.model_metrics = {}
-                
-                # Set task type for proper comparison
-                st.session_state.task_type = "regression"
-                
-                # Save metrics to session state
-                st.session_state.model_metrics[model_name] = {
-                    "Test R²": test_r2,
-                    "Train R²": train_r2,
-                    "Test MSE": test_mse,
-                    "Train MSE": train_mse,
-                    "RMSE": np.sqrt(test_mse)
-                }
-                
+                    st.session_state.model_metrics = ModelMetricsContainer(model_metrics)
+                else:
+                    st.session_state.model_metrics.append(model_metrics)
                 st.success(f"Model '{model_name}' saved for comparison!")
                 st.info("Go to the Model Comparison page to compare with other models.")
             
@@ -278,20 +275,14 @@ else:
                 
                 if st.button("Save GridSearch Model Metrics"):
                     # Initialize model_metrics in session state if it doesn't exist
+                    model_metrics = ModelMetric(model_name=model_name_gs, metrics={
+                        "Train R²": train_r2, "Test R²": test_r2,
+                        "Train MSE": train_mse, "Test MSE": test_mse, "RMSE": np.sqrt(test_mse)})
+
                     if "model_metrics" not in st.session_state:
-                        st.session_state.model_metrics = {}
-                    
-                    # Set task type for proper comparison
-                    st.session_state.task_type = "regression"
-                    
-                    # Save metrics to session state
-                    st.session_state.model_metrics[model_name_gs] = {
-                        "Test R²": test_r2,
-                        "Train R²": train_r2,
-                        "Test MSE": test_mse,
-                        "Train MSE": train_mse,
-                        "RMSE": np.sqrt(test_mse)
-                    }
+                        st.session_state.model_metrics = ModelMetricsContainer(model_metrics)
+                    else:
+                        st.session_state.model_metrics.append(model_metrics)
                     
                     st.success(f"Model '{model_name_gs}' saved for comparison!")
                     st.info("Go to the Model Comparison page to compare with other models.")

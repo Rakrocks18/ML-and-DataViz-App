@@ -6,6 +6,8 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_squared_error
 
+from analysis.model_metrics_container import ModelMetric, ModelMetricsContainer
+
 st.title("Linear Regression Analysis")
 
 if "X_train" not in st.session_state:
@@ -61,6 +63,9 @@ else:
         train_mse = mean_squared_error(y_train, y_train_pred)
         test_mse = mean_squared_error(y_test, y_test_pred)
         
+        
+
+
         # Display metrics
         st.subheader("Model Performance")
         col1, col2 = st.columns(2)
@@ -74,21 +79,14 @@ else:
         model_name = st.text_input("Model Name", f"Linear Regression ({', '.join(selected_features)})")
         
         if st.button("Save Model Metrics"):
-            # Initialize model_metrics in session state if it doesn't exist
+            model_metrics = ModelMetric(model_name=model_name, metrics={
+            "Train R²": train_r2, "Test R²": test_r2,
+            "Train MSE": train_mse, "Test MSE": test_mse, "RMSE": np.sqrt(test_mse)})
+
             if "model_metrics" not in st.session_state:
-                st.session_state.model_metrics = {}
-                
-            # Set task type for proper comparison
-            st.session_state.task_type = "regression"
-                
-            # Save metrics to session state
-            st.session_state.model_metrics[model_name] = {
-                "Test R²": test_r2,
-                "Train R²": train_r2,
-                "Test MSE": test_mse,
-                "Train MSE": train_mse,
-                "RMSE": np.sqrt(test_mse)
-            }
+                st.session_state.model_metrics = ModelMetricsContainer(model_metrics)
+            else:
+                st.session_state.model_metrics.append(model_metrics)
             
             st.success(f"Model '{model_name}' saved for comparison!")
             st.info("Go to the Model Comparison page to compare with other models.")

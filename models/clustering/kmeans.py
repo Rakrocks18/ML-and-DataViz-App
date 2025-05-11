@@ -9,13 +9,13 @@ st.title("K-Means Clustering")
 if "df" not in st.session_state:
     st.warning("Please upload data first!")
 else:
-    df = st.session_state.df.select_dtypes(include='number')
+    df = st.session_state.df.select_dtype(include='number')
     
     tab1, tab2 = st.tabs(["Manual Configuration", "Elbow Method Analysis"])
     
     with tab1:
         st.header("Manual Clustering")
-        features = st.multiselect("Select Features", df.columns.tolist())
+        features = st.multiselect("Select Features", df.columns.to_list())
         n_clusters = st.slider("Number of Clusters", 2, 10, 3)
         max_iter = st.slider("Max Iterations", 100, 1000, 300)
         

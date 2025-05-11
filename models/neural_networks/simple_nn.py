@@ -69,15 +69,15 @@ else:
                 activation = st.selectbox("Activation Function", ['relu', 'sigmoid'])
                 dropout = st.slider("Dropout Rate", 0.0, 0.5, 0.2)
             with col2:
-                learning_rate = st.number_input("Learning Rate", 1e-4, 1.0, 1e-3, step=1e-3)
+                learning_rate = st.number_input("Learning Rate", 1e-4, 1.0, 1e-3, step=1e-3, format="%.4f")
                 epochs = st.number_input("Epochs", 10, 500, 100)
                 batch_size = st.number_input("Batch Size", 16, 256, 32)
                 optimizer_type = st.selectbox("Optimizer", ['adam', 'sgd'])
 
             if st.button("Train Neural Network"):
                 # Convert data to PyTorch tensors
-                X_train_tensor = torch.tensor(X_train[selected_features].values.astype(np.float32))
-                y_train_tensor = torch.tensor(y_train.values.astype(np.float32 if output_size == 1 else np.int64))
+                X_train_tensor = torch.tensor(X_train[selected_features].values)
+                y_train_tensor = torch.tensor(y_train.values)
                 
                 # Initialize model
                 model = NeuralNet(
@@ -107,8 +107,8 @@ else:
                     # Validation
                     model.eval()
                     with torch.no_grad():
-                        val_outputs = model(torch.tensor(X_test[selected_features].values.astype(np.float32)))
-                        val_loss = criterion(val_outputs.squeeze(), torch.tensor(y_test.values.astype(np.float32 if output_size == 1 else np.int64)))
+                        val_outputs = model(torch.tensor(X_test[selected_features].values))
+                        val_loss = criterion(val_outputs.squeeze(), torch.tensor(y_test.values))
                         val_losses.append(val_loss.item())
 
                 # Plot training curves
@@ -130,7 +130,7 @@ else:
                 # Evaluation
                 model.eval()
                 with torch.no_grad():
-                    y_pred = model(torch.tensor(X_test[selected_features].values.astype(np.float32))).numpy()
+                    y_pred = np.asarray(model(torch.tensor(X_test[selected_features].values)))
 
                 if problem_type == 'classification':
                     y_pred = np.argmax(y_pred, axis=1)
@@ -209,8 +209,8 @@ else:
 
                 # Corrected fit call
                 gs.fit(
-                    X_train[selected_features_tune].values.astype(np.float32),
-                    y_train.values.astype(np.int64 if problem_type == 'classification' else np.float32)
+                    X_train[selected_features_tune].values,
+                    y_train.values
                 )
 
                 # Display results
@@ -230,7 +230,7 @@ else:
 
                 # Best model visualization
                 best_model = gs.best_estimator_
-                y_pred = best_model.predict(X_test[selected_features_tune].values.astype(np.float32))
+                y_pred = best_model.predict(X_test[selected_features_tune].values)
                 
                 if problem_type == 'classification':
                     accuracy = accuracy_score(y_test, y_pred)

@@ -1,11 +1,14 @@
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
-# import numpy as np
+import numpy as np
 import pandas as pd
 from sklearn.linear_model import Lasso
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import r2_score, mean_squared_error
+
+
+from analysis.model_metrics_container import ModelMetric, ModelMetricsContainer
 
 st.title("Lasso Regression Analysis")
 
@@ -18,6 +21,8 @@ else:
     y_train = st.session_state.y_train
     y_test = st.session_state.y_test
     target_name = y_train.name
+
+    st.session_state.task_type = "regression"  # Set task type to regression
 
     # Create tabs for different functionalities
     tab1, tab2 = st.tabs(["Manual Feature Selection", "GridSearchCV Tuning"])
@@ -78,6 +83,23 @@ else:
             })
             coeff_df = coeff_df[coeff_df['Coefficient'].abs() > 1e-6]  # Filter zero coefficients
             coeff_df.loc[len(coeff_df)] = ["Intercept", model.intercept_]
+
+            # Save model metrics for comparison
+            st.subheader("Save Model for Comparison")
+            model_name = st.text_input("Model Name", f"Lasso Regression, {', '.join(selected_features)})")
+            
+            if st.button("Save Model Metrics"):
+                # Initialize model_metrics in session state if it doesn't exist
+                model_metrics = ModelMetric(model_name=model_name, metrics={
+                    "Train R²": train_r2, "Test R²": test_r2,
+                    "Train MSE": train_mse, "Test MSE": test_mse, "RMSE": np.sqrt(test_mse)})
+
+                if "model_metrics" not in st.session_state:
+                    st.session_state.model_metrics = ModelMetricsContainer(model_metrics)
+                else:
+                    st.session_state.model_metrics.append(model_metrics)
+                st.success(f"Model '{model_name}' saved for comparison!")
+                st.info("Go to the Model Comparison page to compare with other models.")
             
             if not coeff_df.empty:
                 st.dataframe(coeff_df, hide_index=True)
@@ -137,6 +159,21 @@ else:
             test_mse = mean_squared_error(y_test, y_test_pred)
             st.write(f"**Test R² Score:** {test_r2:.3f}")
             st.write(f"**Test MSE:** {test_mse:.3f}")
+
+            st.subheader("Save Model for Comparison")
+            model_name_gs = st.text_input("Model Name", f"Lasso Regression, {', '.join(selected_features)})")
+            
+            if st.button("Save Model Metrics"):
+                # Initialize model_metrics in session state if it doesn't exist
+                model_metrics = ModelMetric(model_name=model_name_gs, metrics={
+                   "Test R²": test_r2, "Test MSE": test_mse, "RMSE": np.sqrt(test_mse)})
+
+                if "model_metrics" not in st.session_state:
+                    st.session_state.model_metrics = ModelMetricsContainer(model_metrics)
+                else:
+                    st.session_state.model_metrics.append(model_metrics)
+                st.success(f"Model '{model_name_gs}' saved for comparison!")
+                st.info("Go to the Model Comparison page to compare with other models.")
 
             # Validation curve visualization
             results = pd.DataFrame(grid_search.cv_results_)

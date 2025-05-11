@@ -1,11 +1,11 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
+# import numpy as np
 import plotly.express as px
 from groq import Groq
 from dotenv import load_dotenv
 import os
-import json
+# import json
 
 # Load environment variables from .env file
 load_dotenv()
@@ -21,32 +21,29 @@ else:
 
     # Display metrics table with improved formatting
     st.subheader("Model Performance Metrics")
-    metrics_df = pd.DataFrame(model_metrics).T
+    # Extract model metrics into a list of dicts
+    records = []
+
+    for model_name, metric_obj in model_metrics.get_all().items():
+        metric_data = metric_obj.get_metrics()
+        metric_data['Model'] = model_name  # Add model name as a column
+        records.append(metric_data)
+
+    # Create DataFrame
+    metrics_df = pd.DataFrame(records)
     
-    # Add styling to highlight best metrics
-    if task_type == "regression":
-        # For regression: higher R² is better, lower MSE/RMSE/MAE is better
-        styled_df = metrics_df.style.highlight_max(subset=[col for col in metrics_df.columns if 'r2' in col.lower()])
-        styled_df = styled_df.highlight_min(subset=[col for col in metrics_df.columns 
-                                                  if any(x in col.lower() for x in ['mse', 'rmse', 'mae'])])
-    else:
-        # For classification: higher values are generally better
-        styled_df = metrics_df.style.highlight_max()
-    
-    st.dataframe(styled_df)
-    
+    st.dataframe(metrics_df, hide_index=True)
     # Visualization of metrics
     st.subheader("Metrics Visualization")
     
-    # Create a melted dataframe for visualization
-    viz_df = metrics_df.reset_index().melt(id_vars='index', var_name='Metric', value_name='Value')
-    viz_df.rename(columns={'index': 'Model'}, inplace=True)
-    
+    # Melt the DataFrame for long-form visualization
+    viz_df = metrics_df.melt(id_vars='Model', var_name='Metric', value_name='Value')
+
     # Create bar chart for each metric
-    for metric in metrics_df.columns:
+    for metric in viz_df['Metric'].unique():
         fig = px.bar(
-            viz_df[viz_df['Metric'] == metric], 
-            x='Model', 
+            viz_df[viz_df['Metric'] == metric],
+            x='Model',
             y='Value',
             title=f"{metric} Comparison",
             color='Model'
@@ -60,8 +57,8 @@ Task: Analyze the performance of several {task_type} models trained on the same 
 
 Here are the performance metrics:
 """
-    for model_name, metrics in model_metrics.items():
-        metrics_str = ", ".join([f"{k} = {v:.4f}" for k, v in metrics.items()])
+    for model_name, metrics in model_metrics.get_all().items():
+        metrics_str = ", ".join([f"{k} = {v}" for k, v in metrics.metrics.items()])
         prompt += f"- {model_name}: {metrics_str}\n"
     
     prompt += f"""
