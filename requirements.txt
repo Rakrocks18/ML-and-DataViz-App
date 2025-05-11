@@ -4,7 +4,7 @@ pandas
 plotly
 pyarrow
 scikit-learn
-xgboost
+groq
 numpy
 matplotlib
 seaborn
